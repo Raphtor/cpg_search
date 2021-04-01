@@ -1,0 +1,7 @@
+nengo
+pandas
+jupyter
+matplotlib
+hashids
+tqdm
+
