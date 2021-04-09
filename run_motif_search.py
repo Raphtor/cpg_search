@@ -8,7 +8,7 @@ import pickle
 from hashids import Hashids
 import os
 from tqdm import tqdm
-
+import nengolib
 
 def generate_module_matrices(m, lim=4):
     for i in product("01", repeat=m**2):
@@ -34,6 +34,29 @@ def generate_intermodule_matrices(m):
         ret = np.zeros((m,m))
         np.fill_diagonal(ret,i)
         yield ret
+def construct_graph(mm,lr,imm=None):
+    
+    
+    n = len(mm)
+    n2 = n*2
+    n4 = n*4
+    adj = np.zeros((n2,n2))
+    adj[:n, :n] = mm
+    adj[n:n2, n:n2] = mm
+    adj[n:n2,:n] = lr
+    adj[:n,n:n2] = lr
+    if imm is not None:
+        imadj = np.zeros((n2,n2))
+        imadj[n:,n:] = imm
+        imadj[:n,:n] = imm
+        
+        
+        adj2 = np.zeros((n4,n4))
+        adj2[:n2,:n2] = adj
+        adj2[n2:, n2:] = adj
+        adj2[:n2,n2:] = imadj
+        return adj2
+    return adj
 class MotorNode(object):
     """
     Reads motoneuron output and torque input into the system. 
@@ -72,22 +95,23 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
     W[n:,:n] = lr_matrix
     mn = MotorNode(modules)
     rng = np.random.RandomState(0)
-    biases = np.zeros(n*2)
     
-    biases[0] = nengo.dists.Uniform(4.99,5).sample(1,rng=rng)
-    biases[n] = nengo.dists.Uniform(4.99,5).sample(1, rng=rng)
-    defaults = dict(
-        gain = nengo.dists.Uniform(4.99,5),
-        bias = biases,
-#         noise=nengo.processes.WhiteNoise(),
-        # intercepts=nengo.dists.Uniform(0.1, 0.1),
-        # neuron_type=nengo.LIF(tau_rc=0.02, tau_ref=0.01),
-        # neuron_type=nengo.Izhikevich(tau_recovery=0.02, coupling=0.2, reset_voltage=-65., reset_recovery=8.),
-        neuron_type=nengo.AdaptiveLIF(tau_n=1, inc_n=0.5, tau_rc=0.02, tau_ref=0.002, min_voltage=0, amplitude=1)
-    )
-    motor_filter = nengo.Alpha(0.05)
 
     def create_single_module(i,model, motor_node):
+        biases = np.zeros(n*2)
+        biases = nengo.dists.Uniform(5,5).sample(n*2, rng=rng)
+        # biases[0] = nengo.dists.Uniform(5,5).sample(1, rng=rng)
+        # biases[n] = nengo.dists.Uniform(5,5).sample(1, rng=rng)
+        defaults = dict(
+            gain = nengo.dists.Uniform(5,5),
+            bias = biases,
+    #         noise=nengo.processes.WhiteNoise(),
+            # intercepts=nengo.dists.Uniform(0.1, 0.1),
+            # neuron_type=nengo.LIF(tau_rc=0.02, tau_ref=0.01),
+            # neuron_type=nengo.Izhikevich(tau_recovery=0.02, coupling=0.2, reset_voltage=-65., reset_recovery=8.),
+            neuron_type=nengo.AdaptiveLIF(tau_n=1, inc_n=0.5, tau_rc=0.02, tau_ref=0.002, min_voltage=0, amplitude=1)
+        )
+        motor_filter = nengo.Alpha(0.05)
         with model:
             pop = nengo.Ensemble(n*2,2, **defaults)
             module_conns = nengo.Connection(pop.neurons,pop.neurons, transform=-W, synapse=0.01)
@@ -100,18 +124,20 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
             probes = {'spikes': spike_probe, 'values' : val_probe}
         return pop, probes
     probes = []
+    ens = []
     with nengo.Network(seed=0) as model:
         motor_node = nengo.Node(size_in=2*modules, size_out=modules, output=mn.integrate)
         if modules == 1:
             pop, mprobes = create_single_module(0,model,motor_node)
             probes.append(mprobes)
+            ens.append(pop)
         elif intermodule_matrix is not None:
             im_transform = np.eye(n*2,n*2)
       
             im_transform[:n,:n] = intermodule_matrix
             im_transform[n:,n:] = intermodule_matrix
 
-            pops = []
+            
             prev_module, mprobes = create_single_module(0,model, motor_node)
             pops.append(pops)
             probes.append(mprobes)
@@ -119,14 +145,19 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
                 next_module, mprobes = create_single_module(module, model, motor_node)
                 nengo.Connection(prev_module.neurons, next_module.neurons, transform=-im_transform, synapse=0.01)
                 probes.append(mprobes)
+
         else:
             raise ValueError('intermodule matrix is not set, but number of modules is >1')
                 
-
+    model.ens = ens
     return model,mn, probes
 def run_model(module_matrix,lr_matrix,intermodule_matrix=None, modules=1, metadata=None):
     model, mn, probes = generate_nengo_model(module_matrix, lr_matrix, intermodule_matrix, modules)
+    n = len(module_matrix)
     with nengo.Simulator(model, progress_bar=False, seed=0) as sim:
+        for ens in model.ens:
+            signal = sim.model.sig[ens.neurons]
+            sim.signals[signal['voltage']][:n] = np.ones(n)
         sim.run(6)
     spikedata = [sim.data[probes[i]['spikes']] for i in range(len(probes))]
     valuedata = [sim.data[probes[i]['values']] for i in range(len(probes))]
