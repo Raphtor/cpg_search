@@ -26,12 +26,12 @@ def create_adj_matrix(mm,lr,imm=None,modules=1):
     n = len(mm)
     nn = n*2
     if imm is not None:
-        imadj = np.zeros((8,8))
+        imadj = np.zeros((nn,nn))
         imadj[n:,n:] = imm
         imadj[:n,:n] = imm
     else:
         assert modules == 1,'Modules > 1, but no intermodule matrix given'
-    adj = np.zeros((8,8))
+    adj = np.zeros((nn,nn))
     adj[:n, :n] = mm
     adj[n:nn, n:nn] = mm
     adj[n:nn,:n] = lr
@@ -51,3 +51,12 @@ def create_adj_matrix(mm,lr,imm=None,modules=1):
         adj2[bi:mi,mi:ei] = imadj
         adj2[mi:ei, mi:ei] = adj
     return adj2
+
+
+def eval_cfg(cfg, context):
+    for key,val in cfg.items():
+        if isinstance(val,dict):
+            cfg[key] = eval_cfg(val,context)
+        else:
+            cfg[key] = eval(str(val),context) 
+    return cfg

@@ -35,7 +35,8 @@ def generate_lr_matrices(m, lim=4,scale=-1):
 def generate_intermodule_matrices(m, scale=1):
     for i in product("01", repeat=m):
         ret = np.zeros((m,m))
-        np.fill_diagonal(ret,i*scale)
+        np.fill_diagonal(ret,i)
+        ret = ret*scale
         yield ret
 def make_hash(metadata):
     st = []
@@ -123,6 +124,9 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
             # this should cover every motif
             motor_conn_l = nengo.Connection(pop.neurons[0], motor_node[i*2],synapse=motor_filter)
             motor_conn_r = nengo.Connection(pop.neurons[n], motor_node[i*2+1], synapse=motor_filter)
+
+            inv_motor_conn_l = nengo.Connection(motor_node[i*2],pop.neurons[0], synapse=motor_filter)
+            inv_motor_conn_r = nengo.Connection(motor_node[i*2+1],pop.neurons[n], synapse=motor_filter)
             if generate_probes:
                 spike_probe = nengo.Probe(pop.neurons, 'spikes', synapse=motor_filter)
                 val_probe = nengo.Probe(pop,synapse=nengo.Triangle(0.5))

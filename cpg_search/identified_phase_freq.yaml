@@ -1,0 +1,19 @@
+
+
+generate_intermodule_matrices:
+  m: 4
+  scale: 0.02
+generate_module_matrices:
+  m: 4
+  scale: 1
+generate_lr_matrices:
+  m: 4
+  scale: 1
+
+
+create_and_run_model:
+  imm_synapse: nengo.Alpha(0.05)
+  w_synapse: nengo.Alpha(0.05)
+  modules: 3
+  defaults:
+    neuron_type: nengo.AdaptiveLIF(tau_n=1, inc_n=0.5, tau_rc=0.02, tau_ref=0.02, min_voltage=0, amplitude=1)

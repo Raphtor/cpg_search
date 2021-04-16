@@ -3,7 +3,7 @@ import networkx
 import itertools
 from cpg_search.utils import create_adj_matrix
 import networkx as nx
-def draw_graph(ax, adj2,modules=2,colors=['tab:blue', 'tab:orange']):
+def draw_graph(ax, adj2,modules=2,m=4,with_labels=True,colors=['tab:blue', 'tab:orange'], node_positions=None, **kwargs):
     
     
     
@@ -12,34 +12,45 @@ def draw_graph(ax, adj2,modules=2,colors=['tab:blue', 'tab:orange']):
     # Create graph
     G = nx.from_numpy_matrix(adj2, create_using=nx.DiGraph)
     # Draw graph
-    node_positions = np.array([
-        [-2,1.5], # L1
-        [-0.5,0], # L2
-        [-2.5,-1], # L3
-        [-1,-2], # L4
-        [2,1.5], # R1
-        [0.5,0], # R2
-        [2.5,-1], # R3
-        [1,-2] # R4
-    ])
-    node_positions = np.vstack([node_positions]*modules)
-    olabels = ['L1','L2','L3','L4','R1','R2','R3','R4']
+    if node_positions is None:
+        node_positions = np.array([
+            [-2,1.5], # L1
+            [-0.5,0], # L2
+            [-2.5,-1], # L3
+            [-1,-2], # L4
+            [2,1.5], # R1
+            [0.5,0], # R2
+            [2.5,-1], # R3
+            [1,-2] # R4
+        ])
+    if modules > 1:
+        node_positions = np.vstack([node_positions]*modules)
+    olabels = ['L{}'.format(i) for i in range(1,m+1)]
+    olabels.extend(['R{}'.format(i) for i in range(1,m+1)])
     labels = olabels
     
     for i in range(1,modules):
-        node_positions[8*i:8*(i+1),1] -= 4*i
+        node_positions[m*2*i:m*2*(i+1),1] -= 4.5*i
         labels.extend(olabels)
-    print(node_positions.shape)
-    nodecolors = list(itertools.chain(*[[colors[i]]*8 for i in range(modules)]))
-    labels = dict(zip(range(8*modules),labels))
+    # print(node_positions)
+    nodecolors = list(itertools.chain(*[[colors[i]]*m*2 for i in range(modules)]))
+    labels = dict(zip(range(m*2*modules),labels))
 #     nodecolors = [colors[0]]*8 + [colors[1]]*8
-    nx.draw_networkx(G, pos=node_positions,ax=ax, with_labels=True, labels=labels, node_color=nodecolors )
+    nx.draw_networkx(G, pos=node_positions,ax=ax, with_labels=with_labels, labels=labels, node_color=nodecolors , **kwargs)
+    ax.set_yticks(-np.arange(modules)*4.5)
+    ax.set_yticklabels(['M{}'.format(i) for i in range(1,modules+1)])
+    ax.set_xticks([])
+
     
     
-def draw_adj(ax, adj2):
+def draw_adj(ax, adj2, **kwargs):
     
     
-    im = ax.matshow(adj2, aspect='equal')
+    im = ax.matshow(adj2, aspect='equal', **kwargs)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_ylabel('Presynaptic')
+    ax.set_xlabel('Postsynaptic')
 #     ax.set_xticks(np.arange(-0.5,15,4), minor=True)
 #     ax.set_yticks(np.arange(-0.5,15,4), minor=True)
 #     ax.set_xticks([1.75,5.75,9.75,13.75])
