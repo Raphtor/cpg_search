@@ -12,6 +12,8 @@ import nengolib
 from cpg_search.utils import create_adj_matrix, sin_fit, sin_fit_jac
 from scipy import optimize
 from cpg_search import MotorNode
+negative_alpha = lambda  tau,alpha : nengo.LinearFilter([-alpha,1], [tau ** 2, 2*tau, 1])
+strong_alpha = lambda  tau,alpha : nengo.LinearFilter([alpha,1], [tau ** 2, 2*tau, 1])
 
 def generate_module_matrices(m, lim=4, scale=1):
     for i in product("01", repeat=m**2):
@@ -89,7 +91,20 @@ def fit_curve(ret,tslc,motor_id=0):
 
 
 
-def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, modules=1, generate_probes=True,crop=None,defaults={},motor_filter=nengo.Alpha(0.05),w_synapse=0.01, imm_synapse=0.01):
+def generate_nengo_model(module_matrix,
+    lr_matrix,
+    intermodule_matrix=None, 
+    modules=1, 
+    generate_probes=True,
+    crop=None,
+    defaults={},
+    motor_filter=nengo.Alpha(0.05),
+    w_synapse=0.01, 
+    imm_synapse=0.01,
+    inp_conn_type=None,
+    tau=None,
+    alpha=None
+):
     # Create complete module matrix
     n = len(module_matrix)
     W = np.zeros((n*2,n*2))
@@ -116,7 +131,6 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
             neuron_type=nengo.AdaptiveLIF(tau_n=1, inc_n=0.5, tau_rc=0.02, tau_ref=0.002, min_voltage=0, amplitude=1)
         )
         edefaults.update(defaults)
-        motor_filter = nengo.Alpha(0.05)
         with model:
             pop = nengo.Ensemble(n*2,2, label='module_{}'.format(i),**edefaults)
             module_conns = nengo.Connection(pop.neurons,pop.neurons, transform=-W, synapse=w_synapse)
@@ -124,9 +138,20 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
             # this should cover every motif
             motor_conn_l = nengo.Connection(pop.neurons[0], motor_node[i*2],synapse=motor_filter)
             motor_conn_r = nengo.Connection(pop.neurons[n], motor_node[i*2+1], synapse=motor_filter)
-
-            inv_motor_conn_l = nengo.Connection(motor_node[i*2],pop.neurons[0], synapse=motor_filter)
-            inv_motor_conn_r = nengo.Connection(motor_node[i*2+1],pop.neurons[n], synapse=motor_filter)
+            if inp_conn_type=='standard':
+                inv_motor_conn_l = nengo.Connection(motor_node[i*2],pop.neurons[0], synapse=motor_filter)
+                inv_motor_conn_r = nengo.Connection(motor_node[i*2+1],pop.neurons[n], synapse=motor_filter)
+            elif inp_conn_type=='advanced':
+                if tau is None or alpha is None:
+                    raise ValueError('tau or alpha cannot be None for advanced input connection')
+                fast_conn_l = nengo.Connection(motor_node[4*i],pop.neurons[0], transform=-1, synapse=negative_alpha(tau,alpha))
+                fast_conn_r = nengo.Connection(motor_node[4*i+1],pop.neurons[n], transform=-1, synapse=negative_alpha(tau,alpha))
+                slow_conn_l = nengo.Connection(motor_node[4*i+2],pop.neurons[0], transform=-1, synapse=strong_alpha(tau,alpha))
+                slow_conn_r = nengo.Connection(motor_node[4*i+3],pop.neurons[n], transform=-1, synapse=strong_alpha(tau,alpha))
+            elif inp_conn_type is None:
+                pass
+            else:
+                raise ValueError('Unsupported motor input connection type {}'.format(str(inp_conn_type)))
             if generate_probes:
                 spike_probe = nengo.Probe(pop.neurons, 'spikes', synapse=motor_filter)
                 val_probe = nengo.Probe(pop,synapse=nengo.Triangle(0.5))
@@ -138,6 +163,10 @@ def generate_nengo_model(module_matrix,lr_matrix,intermodule_matrix=None, module
     ens = []
     with nengo.Network(seed=0) as model:
         motor_node = nengo.Node(size_in=2*modules, output=mn.integrate, label="motor_node")
+        if inp_conn_type == 'standard':
+            motor_node.size_out = 2*modules
+        elif inp_conn_type == 'advanced':
+            motor_node.size_out = 4*modules
         if modules == 1:
             pop, mprobes = create_single_module(0,model,motor_node)
             probes.append(mprobes)

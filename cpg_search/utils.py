@@ -58,5 +58,8 @@ def eval_cfg(cfg, context):
         if isinstance(val,dict):
             cfg[key] = eval_cfg(val,context)
         else:
-            cfg[key] = eval(str(val),context) 
+            try:
+                cfg[key] = eval(str(val),context) 
+            except NameError:
+                cfg[key] = val
     return cfg
