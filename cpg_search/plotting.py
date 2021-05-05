@@ -3,9 +3,10 @@ import networkx
 import itertools
 from cpg_search.utils import create_adj_matrix
 import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
 import networkx as nx
 from scipy.signal import find_peaks
-def draw_graph(ax, adj2,modules=2,m=4,with_labels=True,colors=['tab:blue', 'tab:orange'], node_positions=None, **kwargs):
+def draw_graph(ax, adj2,modules=2,m=4,with_labels=True,colors=['tab:blue', 'tab:orange'], node_positions=None,arrow_colors=None, **kwargs):
     
     
     
@@ -38,6 +39,15 @@ def draw_graph(ax, adj2,modules=2,m=4,with_labels=True,colors=['tab:blue', 'tab:
     nodecolors = list(itertools.chain(*[[colors[i]]*m*2 for i in range(modules)]))
     labels = dict(zip(range(m*2*modules),labels))
 #     nodecolors = [colors[0]]*8 + [colors[1]]*8
+    # nx.draw_networkx_nodes(G, pos=node_positions,ax=ax, edgecolors='k',node_color=[1,1,1,0], **kwargs)
+    # arrows = nx.draw_networkx_edges(G, pos=node_positions, ax=ax, **kwargs)
+    # for arrow in arrows:
+    #     arrow.set_fc(arrow_colors)
+    #     # arrow.set_arrowstyle('<|-|>')
+    #     arrow.set_patchB(mpatches.Circle([0,0], radius=10))
+    # if with_labels:
+    #     nx.draw_networkx_labels(G, pos=node_positions, labels=labels)
+
     nx.draw_networkx(G, pos=node_positions,ax=ax, with_labels=with_labels, labels=labels, node_color=nodecolors , **kwargs)
     ax.set_yticks(-np.arange(modules)*4.5)
     ax.set_yticklabels(['M{}'.format(i) for i in range(1,modules+1)])
@@ -82,7 +92,7 @@ def plot_limit_cycle(ret,ax,tslc=slice(0,None),N=10):
     ax.set_aspect('equal')
 
 
-def plot_spikes(axs, sim, probes1,it,begin_time,insert_time=None):
+def plot_spikes(axs, sim, probes1,it,begin_time,insert_time=None,colorbar=True,cmap='jet'):
     T = sim.trange()
     tslc = np.where(T>begin_time)[0]
     spike1 = [sim.data[probes1[i]['spikes']] for i in range(len(probes1))]
@@ -99,7 +109,7 @@ def plot_spikes(axs, sim, probes1,it,begin_time,insert_time=None):
     et = T[tslc][-1]
     bi = -0.5
     ei = ims.shape[0]-0.5
-    im = axs.matshow(ims,aspect='auto',extent=[bt,et,ei,bi])
+    im = axs.matshow(ims,aspect='auto',extent=[bt,et,ei,bi],cmap=cmap)
     # im = axs[0].matshow(ims,aspect='auto')
 
     axs.set_xlabel('Time (s)')
@@ -107,13 +117,14 @@ def plot_spikes(axs, sim, probes1,it,begin_time,insert_time=None):
     axs.set_yticks(range(len(it)*2))
     axs.xaxis.tick_bottom()
     axs.set_yticklabels(labels)
-    cbar = plt.colorbar(im,ax=axs)
-    cbar.ax.title.set_text('Hz')
+    if colorbar:
+        cbar = plt.colorbar(im,ax=axs)
+        cbar.ax.title.set_text('Hz')
     labels = ['M1L1', 'M1R1','M2L1','M2R1','M3L1','M3R1']
     if insert_time is not None:
-        axs.axvline(insert_time, ls='--', color='r')
+        axs.axvline(insert_time, ls='--', color='k')
     plt.tight_layout()
-def plot_output_compliance(ax, mn,begin_time,sim,it,insert_time=None,before_ls='-', after_ls='-',show_peaks=False):
+def plot_output_compliance(ax, mn,begin_time,sim,it,insert_time=None,before_ls='-', after_ls='-',show_peaks=False,lcolors= ['tab:green', 'tab:orange','tab:purple','tab:brown','tab:cyan']):
     T = sim.trange()
     tslc = np.where(T>begin_time)
 
@@ -124,7 +135,6 @@ def plot_output_compliance(ax, mn,begin_time,sim,it,insert_time=None,before_ls='
     in_slc = np.where(T>insert_time)[0]
     out_slc = np.where(np.logical_and(begin_time<T,T<insert_time))[0]
     tslc = np.where(T>begin_time)[0]
-    lcolors = ['tab:green', 'tab:orange','tab:purple','tab:brown','tab:cyan']
     sc = 5
     for i in it:
         if i == 0:
@@ -133,7 +143,7 @@ def plot_output_compliance(ax, mn,begin_time,sim,it,insert_time=None,before_ls='
         else:
             ax.plot(T[tslc], out[tslc,i]/sc,color=lcolors[i],alpha=0.3)
     if insert_time != T[-1]:
-        ax.axvline(insert_time,color='r', ls='--')
+        ax.axvline(insert_time,color='k', ls='--')
     if show_peaks:
         peaks,_ = find_peaks(out[in_slc,0])
         npeaks,_ = find_peaks(-out[in_slc,0])
@@ -144,7 +154,7 @@ def plot_output_compliance(ax, mn,begin_time,sim,it,insert_time=None,before_ls='
     ax.set_xlabel('Time')
     ax.set_ylabel('Motor value')
 
-def plot_before_after_bar(ax,mn,begin_time, sim,insert_time,it,baseline_output):
+def plot_before_after_bar(ax,mn,begin_time, sim,insert_time,it,baseline_output,colors=['tab:blue','tab:orange']):
     T = sim.trange()
     tslc = np.where(T>begin_time)
 
@@ -173,9 +183,9 @@ def plot_before_after_bar(ax,mn,begin_time, sim,insert_time,it,baseline_output):
         
         after_amps.append(get_amp(out[in_slc,i])/sc)
     M_r = it
-    ax.bar(M_r*2, baseline_amps)
+    ax.bar(M_r*2, baseline_amps,color=colors[0])
     # ax.bar(M_r*2+1, bbefore_amps)
-    ax.bar(M_r*2+1, after_amps)
+    ax.bar(M_r*2+1, after_amps,color=colors[1])
     ax.set_xticks(M_r*2+0.5,minor=True)
     ax.set_xticks(M_r*2-0.5)
     ax.tick_params(axis='x',which='minor',bottom=False)
@@ -185,14 +195,14 @@ def plot_before_after_bar(ax,mn,begin_time, sim,insert_time,it,baseline_output):
     ax.set_xlabel('Motor #')
     ax.set_ylabel('Amplitude')
 
-def plot_input_currents(ax,mn, sim,begin_time,inp_probes,insert_time):
+def plot_input_currents(ax,mn, sim,begin_time,inp_probes,insert_time,colors=['tab:blue', 'tab:orange']):
     T = sim.trange()
     tslc = np.where(T>begin_time)[0]
 
-    ax.plot(T[tslc], sim.data[inp_probes[0]][tslc,0]+5)
-    ax.plot(T[tslc], sim.data[inp_probes[0]][tslc,4]+5)
+    ax.plot(T[tslc], sim.data[inp_probes[0]][tslc,0]+5,color=colors[0])
+    ax.plot(T[tslc], sim.data[inp_probes[0]][tslc,4]+5,color=colors[1])
     ax.legend(['L1','R1'])
     ax.set_yscale('symlog')
-    ax.axvline(insert_time, ls='--', color='r')
+    ax.axvline(insert_time, ls='--', color='k')
     ax.set_ylabel('Input current (u)')
     ax.set_xlabel('Time (s)')

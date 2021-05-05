@@ -99,6 +99,7 @@ def generate_nengo_model(module_matrix,
     crop=None,
     defaults={},
     motor_filter=nengo.Alpha(0.05),
+    motor_probe_filter=nengo.Alpha(0.05),
     w_synapse=0.01, 
     imm_synapse=0.01,
     inp_conn_type=None,
@@ -153,7 +154,7 @@ def generate_nengo_model(module_matrix,
             else:
                 raise ValueError('Unsupported motor input connection type {}'.format(str(inp_conn_type)))
             if generate_probes:
-                spike_probe = nengo.Probe(pop.neurons, 'spikes', synapse=motor_filter)
+                spike_probe = nengo.Probe(pop.neurons, 'spikes', synapse=motor_probe_filter)
                 val_probe = nengo.Probe(pop,synapse=nengo.Triangle(0.5))
                 probes = {'spikes': spike_probe, 'values' : val_probe}
             else:
