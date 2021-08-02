@@ -1,0 +1,21 @@
+generate_nengo_model:
+  defaults: {neuron_type: 'nengo.AdaptiveLIF(tau_n=1, inc_n=0.5, tau_rc=0.02, tau_ref=0.02,
+      min_voltage=0, amplitude=1)'}
+  imm_synapse: nengo.Alpha(0.05)
+  intermodule_matrix:
+  - [0.02, 0.0, 0.0, 0.0]
+  - [0.0, 0.0, 0.0, 0.0]
+  - [0.0, 0.0, 0.02, 0.0]
+  - [0.0, 0.0, 0.0, 0.02]
+  lr_matrix:
+  - [1, 0, 0, 0]
+  - [1, 0, 0, 0]
+  - [0, 0, 0, 0]
+  - [0, 0, 0, 0]
+  module_matrix:
+  - [0, 1, 0, 0]
+  - [0, 0, 0, 1]
+  - [0, 0, 0, 0]
+  - [1, 1, 0, 0]
+  modules: 12
+  w_synapse: nengo.Alpha(0.02)
